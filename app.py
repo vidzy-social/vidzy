@@ -228,6 +228,7 @@ def delete_non_existent_files_from_shorts():
 import admin
 import demos
 import comments
+import errors
 
 @app.route("/like_post")
 def like_post_page():
@@ -1010,17 +1011,6 @@ def about():
     total_accounts = floor_to_multiple(cur.fetchall()[0]["total_accounts"], 5)
 
     return render_template('about.html', instance_domain=urlparse(request.base_url).hostname, total_accounts=total_accounts)
-
-############## ERRORS ##############
-####################################
-
-@app.errorhandler(404)
-def page_not_found(e):
-    return render_template('404.html'), 404
-
-@app.errorhandler(500)
-def page_not_found(e):
-    return render_template('500.html'), 500
 
 def create_app():
     return app
