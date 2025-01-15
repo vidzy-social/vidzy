@@ -39,6 +39,7 @@ from moviepy import VideoFileClip
 
 import vidzyconfig
 
+
 CLEANR = re.compile('<.*?>')
 def cleanhtml(raw_html):
     cleantext = re.sub(CLEANR, '', raw_html)
@@ -222,6 +223,9 @@ def delete_non_existent_files_from_shorts():
         cursor.close()
     
     return entries_deleted
+
+# Routes
+import admin
 
 @app.route("/camera")
 def camera_route():
@@ -443,8 +447,6 @@ def video_privateanalytics(short_id):
         return "<script>window.location.href='/';</script>"
 
     return render_template('private_vid_analytics.html', session=session, short=short)
-
-import admin
 
 @app.route("/search")
 def search_page():
