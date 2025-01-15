@@ -253,34 +253,6 @@ def like_post_page():
 
     return "Success"
 
-@app.route("/send_comment")
-def send_comment_page():
-    if "user" not in session:
-        return "NotLoggedIn"
-
-    parent_comment = request.args.get("parent", default=None)
-    if parent_comment is not None:
-        parent_comment = SQLAlchemy_session.query(Comment).get(int(parent_comment))
-
-    shortid = request.args.get("shortid")
-
-    cursor = mysql.connection.cursor()
-    cursor.execute("SELECT count(*) comment_count FROM `comments` WHERE short_id = %s AND user_id = %s;", (shortid, session["user"]["id"]))
-    comment_count = int(cursor.fetchall()[0]["comment_count"])
-
-    if comment_count >= 40:
-        return "TooManyComments"
-
-    mycomment = Comment(text=request.args.get("txt"), author=session["user"]["id"], short_id=int(shortid), parent=parent_comment)
-
-    with app.app_context():
-        mycomment.save()
-
-    for comment in SQLAlchemy_session.query(Comment).order_by(Comment.path):
-        print('{}{}: {}'.format('  ' * comment.level(), comment.author, comment.text))
-
-    return "Success"
-
 @app.route("/if_liked_post")
 def liked_post_page():
     if "user" not in session:
