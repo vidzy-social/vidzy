@@ -38,7 +38,7 @@ import sqlalchemy
 from moviepy import VideoFileClip
 
 import vidzyconfig
-from app import app, session, mysql
+from app import app, session, mysql, Comment, SQLAlchemy_session
 
 @app.route("/comments/<shortid>")
 def comments_route(shortid):
