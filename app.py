@@ -226,20 +226,8 @@ def delete_non_existent_files_from_shorts():
 
 # Routes
 import admin
-
-@app.route("/camera")
-def camera_route():
-    return app.send_static_file('demos/threejs/glassesVTO/index.html')
-
-@app.route("/comments/<shortid>")
-def comments_route(shortid):
-    comments = SQLAlchemy_session.query(Comment).filter(Comment.short_id == shortid).order_by(Comment.path)
-
-    try:
-        return render_template("comments.html", comments=comments)
-    except sqlalchemy.exc.PendingRollbackError:
-        SQLAlchemy_session.rollback()
-        return render_template("comments.html", comments=comments)
+import demos
+import comments
 
 @app.route("/like_post")
 def like_post_page():
