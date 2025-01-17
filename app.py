@@ -225,10 +225,10 @@ def delete_non_existent_files_from_shorts():
     return entries_deleted
 
 # Routes
-import admin
-import demos
-import comments
-import errors
+import routes.admin
+import routes.demos
+import routes.comments
+import routes.errors
 
 @app.route("/like_post")
 def like_post_page():
