@@ -40,9 +40,6 @@ from moviepy import VideoFileClip
 import vidzyconfig
 from app import app, session, mysql
 
-#######################################################################
-########################### ADMIN STUFF ################################
-
 @app.route("/admin")
 def admin_panel():
     if "user" not in session:
@@ -187,5 +184,7 @@ def promote_user():
 
     return redirect("/admin", code=302)
 
-######################### END ADMIN STUFF ##############################
-########################################################################
+@app.route("/cleanup")
+def cleanup_page():
+    entries_deleted = delete_non_existent_files_from_shorts()
+    return "<h2>Cleanup complete. " + str(entries_deleted) + " entries deleted.</h2>"

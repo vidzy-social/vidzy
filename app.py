@@ -231,51 +231,10 @@ import routes.comments
 import routes.errors
 import routes.account
 import routes.api
-
-@app.route("/like_post")
-def like_post_page():
-    if "user" not in session:
-        return "NotLoggedIn"
-
-    mycursor = mysql.connection.cursor()
-
-    mycursor.execute("SELECT * FROM likes WHERE short_id = %s AND user_id = %s;", (str(request.args.get("id")), str(session["user"]["id"])))
-
-    myresult = mycursor.fetchall()
-
-    for _ in myresult:
-        return "Already Liked"
-
-    mycursor = mysql.connection.cursor()
-
-    sql = "INSERT INTO `likes` (`short_id`, `user_id`) VALUES (%s, %s)"
-    val = (request.args.get("id"), session["user"]["id"])
-    mycursor.execute(sql, val)
-
-    mysql.connection.commit()
-
-    return "Success"
-
-@app.route("/if_liked_post")
-def liked_post_page():
-    if "user" not in session:
-        return "NotLoggedIn"
-
-    mycursor = mysql.connection.cursor()
-
-    mycursor.execute("SELECT * FROM likes WHERE short_id = %s AND user_id = %s;", (str(request.args.get("id")), str(session["user"]["id"])))
-
-    myresult = mycursor.fetchall()
-
-    for _ in myresult:
-        return "true"
-
-    return "false"
-
-@app.route("/cleanup")
-def cleanup_page():
-    entries_deleted = delete_non_existent_files_from_shorts()
-    return "<h2>Cleanup complete. " + str(entries_deleted) + " entries deleted.</h2>"
+import routes.feeds
+import routes.shorts
+import routes.interactions
+import routes.users
 
 @app.route("/")
 def index_page():
@@ -342,29 +301,6 @@ def index_page():
         return render_template('index.html', shorts=final_videos, session=session, logged_in = logged_in)
     return explore_page()
 
-@app.route("/public/remote")
-def public_remote_page():
-    logged_in = "username" in session
-
-    instances = json.loads(requests.get("https://raw.githubusercontent.com/vidzy-social/vidzy-social.github.io/main/instancelist.json", timeout=20).text)
-
-    rv = tuple()
-
-    for i in instances:
-        if requests.get(i + "/api/vidzy", timeout=20).text != "vidzy":
-            print("Skipped instance: " + i)
-        else:
-            r = json.loads(requests.get(i + "/api/live_feed/full", timeout=20).text)
-            for c in r:
-                c["url"] = i + "/static/uploads/" + c["url"]
-                rv = rv + (c,)
-
-    rv = sorted(rv, key=itemgetter('id'), reverse=True)
-
-    rv = rv[:10]
-
-    return render_template('index.html', shorts=rv, session=session, logged_in = logged_in)
-
 @app.route("/settings", methods=['POST', 'GET'])
 def settings_page():
     if "username" in request.form:
@@ -381,35 +317,6 @@ def settings_page():
 
     return render_template('settings.html', username=session["user"]["username"], email=session["user"]["email"])
 
-@app.route("/shorts/<short>/analytics/public")
-def video_publicanalytics(short):
-    if "user" not in session:
-        return "<script>window.location.href='/login';</script>"
-
-    cur = mysql.connection.cursor()
-
-    cur.execute("SELECT *, (SELECT count(*) FROM `likes` WHERE short_id = p.id) like_count FROM `shorts` p  WHERE (`id` = %s);", (short,))
-    short = cur.fetchall()[0]
-
-    return render_template('public_vid_analytics.html', session=session, short=short, time_uploaded=time)
-
-@app.route("/shorts/<short_id>/analytics/private")
-def video_privateanalytics(short_id):
-    if "user" not in session:
-        return "<script>window.location.href='/login';</script>"
-
-    cur = mysql.connection.cursor()
-
-    cur.execute("SELECT *, (SELECT count(*) FROM `likes` WHERE short_id = p.id) like_count FROM `shorts` p  WHERE (`id` = %s);", (short_id,))
-    short = cur.fetchall()
-    if len(short) == 0:
-        return "Video not found."
-    short = short[0]
-
-    if session["user"]["id"] != short["user_id"]:
-        return "<script>window.location.href='/';</script>"
-
-    return render_template('private_vid_analytics.html', session=session, short=short)
 
 @app.route("/search")
 def search_page():
@@ -424,127 +331,6 @@ def search_page():
 
     return render_template('search.html', shorts=rv, session=session, query=query, logged_in = "username" in session)
 
-@app.route("/explore")
-def explore_page():
-    logged_in = "username" in session
-
-    cur = mysql.connection.cursor()
-    cur.execute(
-        "SELECT *, (SELECT count(*) FROM `likes` p WHERE p.short_id = shorts.id) likes FROM shorts ORDER BY likes DESC LIMIT 3;")
-    rv = cur.fetchall()
-
-    return render_template('explore.html', shorts=rv, session=session, logged_in = logged_in, page="explore")
-
-@app.route("/livefeed")
-def livefeed_page():
-    logged_in = "username" in session
-
-    cur = mysql.connection.cursor()
-    cur.execute(
-        "SELECT *, (SELECT count(*) FROM `likes` p WHERE p.short_id = shorts.id) likes FROM shorts ORDER BY id DESC LIMIT 3;")
-    rv = cur.fetchall()
-
-    return render_template('explore.html', shorts=rv, session=session, logged_in = logged_in, page="livefeed")
-
-@app.route("/tags/<tag>")
-def tag_page(tag):
-    logged_in = "username" in session
-
-    cur = mysql.connection.cursor()
-    cur.execute(
-        "SELECT *, (SELECT count(*) FROM `likes` p WHERE p.short_id = shorts.id) likes FROM shorts WHERE description LIKE %s ORDER BY id DESC LIMIT 3;", ('%#' + tag + '%',))
-    rv = cur.fetchall()
-
-    return render_template('explore.html', shorts=rv, session=session, logged_in = logged_in, page="livefeed")
-
-@app.route("/users/<user>")
-def profile_page(user):
-    if "@" in user:
-        if user.split("@")[1] != str(urlparse(request.base_url).netloc):
-            return remote_profile_page(user)
-        return remote_profile_page(user) # TEMPORARY FOR TESTING
-        #user = user.split("@")[0]
-
-    cur = mysql.connection.cursor()
-
-    cur.execute("SELECT * FROM users WHERE username=%s;", (user, ))
-    user = cur.fetchall()[0]
-
-    cur.execute("SELECT * FROM shorts WHERE user_id=%s;", (str(user["id"]), ))
-    latest_short_list = cur.fetchall()
-
-    cur.execute("SELECT count(*) c FROM shorts WHERE user_id=%s;", (str(user["id"]), ))
-    shorts_count = cur.fetchall()[0]["c"]
-
-    if "user" in session:
-        cur.execute("SELECT * FROM follows WHERE follower_id=%s AND following_id=%s;", (str(session["user"]["id"]), str(user["id"])))
-        following = False
-        for _ in cur.fetchall():
-            following = True
-    else:
-        following = False
-
-    cur.execute("SELECT count(*) c FROM follows WHERE following_id=%s;", (str(user["id"]),))
-    for _ in cur.fetchall():
-        follower_count = _["c"]
-
-    return render_template('profile.html', user=user, session=session, latest_short_list=latest_short_list, following=following, follower_count=follower_count, shorts_count=shorts_count)
-
-def remote_vidzy_profile_page(user):
-    print("http://" + user.split("@")[1] + "/api/users/" + user.split("@")[0])
-    r = requests.get("http://" + user.split("@")[1] + "/api/users/" + user.split("@")[0], timeout=20).text
-    data = json.loads(r)
-    if not "followers" in data:
-        data["followers"] = 0
-    return render_template("remote_user.html", shorts=data["videos"], followers_count=data["followers"], user_info=data, full_username=user, logged_in = "username" in session)
-
-@app.route("/remote_user/<user>")
-def remote_profile_page(user):
-    if requests.get("http://" + user.split("@")[1] + "/api/vidzy", timeout=20).text == "vidzy":
-        print("Vidzy instance detected")
-        return remote_vidzy_profile_page(user)
-
-    variant = ""
-
-    try:
-        outbox = json.loads(requests.get("https://" + user.split("@")[1] + "/users/" + user.split("@")[0] + "/outbox?page=true", timeout=20).text)
-        variant = "mastodon"
-    except json.decoder.JSONDecodeError:
-        outbox = json.loads(requests.get("https://" + user.split("@")[1] + "/accounts/" + user.split("@")[0] + "/outbox?page=1", headers={"Accept":"application/activity+json"}, timeout=20).text)
-        variant = "peertube"
-
-    shorts = []
-
-    for post in outbox["orderedItems"]:
-        if isinstance(post["object"], dict):
-            if variant == "peertube":
-                for i in post["object"]["url"][1]["tag"]:
-                    if "mediaType" in i:
-                        if i["mediaType"] == "video/mp4":
-                            shorts.append( {"id": 1, "url": i["href"], "username": user, "title": "test"} )
-                            break
-            else:
-                if len(post["object"]["attachment"]) > 0:
-                    if post["object"]["attachment"][0]["mediaType"].startswith("video"):
-                        shorts.append( { "id": 1, "url": post["object"]["attachment"][0]["url"], "username": user, "title": cleanhtml(post["object"]["content"]) } )
-
-    if variant == "mastodon":
-        followers_count = json.loads(
-            requests.get("https://" + user.split("@")[1] + "/users/" + user.split("@")[0] + "/followers", headers={"Accept":"application/activity+json"}, timeout=20).text
-        )["totalItems"]
-    else:
-        followers_count = 0
-
-    if variant == "mastodon":
-        user_info = json.loads(
-            requests.get("https://" + user.split("@")[1] + "/users/" + user.split("@")[0], headers={"Accept":"application/activity+json"}, timeout=20).text
-        )
-    else:
-        user_info = {}
-
-    return render_template("remote_user.html", shorts=shorts, followers_count=followers_count, user_info=user_info, full_username=user, logged_in = "username" in session)
-
-
 @app.route("/hcard/users/<guid>")
 def hcard_page(guid):
     user = bytes.fromhex(guid).decode('utf-8')
@@ -558,35 +344,6 @@ def hcard_page(guid):
     latest_short_list = cur.fetchall()
 
     return render_template('profile_hcard.html', user=user, session=session, latest_short_list=latest_short_list, guid=guid)
-
-
-@app.route("/users/<user>/feed")
-def profile_feed_page(user):
-    cur = mysql.connection.cursor()
-
-    cur.execute("SELECT * FROM users WHERE username=%s;", (user, ))
-    user = cur.fetchall()[0]
-
-    cur.execute("SELECT * FROM shorts WHERE user_id=%s;", (str(user["id"]), ))
-    latest_short_list = cur.fetchall()
-
-    resp = make_response(render_template(
-        'profile_feed.xml', user=user, session=session, latest_short_list=latest_short_list))
-    resp.headers['Content-type'] = 'text/xml; charset=utf-8'
-    return resp
-
-
-@app.route("/shorts/<short>")
-def short_page(short):
-    if "username" not in session:
-        return "<script>window.location.href='/login';</script>"
-
-    cur = mysql.connection.cursor()
-    cur.execute("SELECT *, (SELECT count(*) FROM `likes` WHERE short_id = p.id) likes FROM shorts p WHERE id = %s;", (short,))
-    rv = cur.fetchall()[0]
-
-    return render_template('short.html', short=rv, session=session, logged_in = "username" in session)
-
 
 @app.route('/static/<path:path>')
 def send_static(path):
@@ -748,51 +505,6 @@ def upload_file():
 @app.route("/onboarding")
 def onboarding_page():
     return render_template("onboarding.html")
-
-@app.route('/follow')
-def follow():
-    following_id = str(request.args.get("id"))
-
-
-    cur = mysql.connection.cursor()
-
-
-    cur.execute("SELECT * FROM follows WHERE following_id = %s AND follower_id = %s;", (following_id, str(session["user"]["id"])))
-
-    myresult = cur.fetchall()
-
-    for _ in myresult:
-        return "Already following"
-
-
-    cur.execute("""INSERT INTO follows (follower_id, following_id) VALUES (%s,%s)""", (str(session["user"]["id"]), following_id))
-    mysql.connection.commit()
-
-    return "Done"
-
-@app.route('/unfollow')
-def unfollow():
-    following_id = str(request.args.get("id"))
-
-
-    cur = mysql.connection.cursor()
-
-
-    cur.execute("SELECT * FROM follows WHERE following_id = %s AND follower_id = %s;", (following_id, str(session["user"]["id"])))
-
-    myresult = cur.fetchall()
-
-    following = False
-    for _ in myresult:
-        following = True
-
-    if not following:
-        return "Not currently following user"
-
-    cur.execute("""DELETE FROM `follows` WHERE `follower_id` = %s AND `following_id` = %s;""", (str(session["user"]["id"]), following_id))
-    mysql.connection.commit()
-
-    return "Done"
 
 def round_to_multiple(number, multiple):
     return multiple * round(number / multiple)
