@@ -262,16 +262,6 @@ def index_page():
 
         rv = sorted(rv, key=itemgetter('id'), reverse=True)
 
-        '''
-        # Random chance for a video to swap with another video within 5 positions of itself
-        for i in range(len(rv)):
-            if random.random() < 0.2:  # 20% chance to swap
-                # Limit swap range to be within 5 positions
-                swap_index = random.randint(max(i - 5, 0), min(i + 5, len(rv) - 1))
-                if swap_index != i:  # Avoid swapping with the same item
-                    rv[i], rv[swap_index] = rv[swap_index], rv[i]
-        '''
-
         grouped_by_date = defaultdict(lambda: defaultdict(list))
 
         for video in rv:

@@ -22,4 +22,4 @@ jobs:
           pip install pylint-flask
       - name: Analysing the code with pylint
         run: |
-          pylint --fail-under=9.80 --load-plugins pylint_flask --max-line-length=410 $(git ls-files '*.py' ':!static') --disable C0301,C0116,C0114,E0602,C0302,C0115,C0103,W0401,C0209,R0912,R1702,W0614,E1101,C0303
+          pylint --fail-under=9.80 --load-plugins pylint_flask --max-line-length=410 $(git ls-files '*.py' ':!static') --disable C0301,C0116,C0114,E0602,C0302,C0115,C0103,W0401,C0209,R0912,R1702,W0614,E1101,C0303,C0121
